@@ -80,14 +80,37 @@ docs/
 
 ## 最快使用方式
 
-详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+如果是在另一台新电脑上复刻，优先看：
+
+[docs/REPRODUCE_ON_NEW_PC.md](docs/REPRODUCE_ON_NEW_PC.md)
+
+开源/外部软件下载清单：
+
+[docs/OPEN_SOURCE_DOWNLOADS.md](docs/OPEN_SOURCE_DOWNLOADS.md)
+
+配置项总表：
+
+[docs/CONFIGURATION_MATRIX.md](docs/CONFIGURATION_MATRIX.md)
+
+已有数据迁移：
+
+[docs/DATA_MIGRATION.md](docs/DATA_MIGRATION.md)
+
+原有部署说明：
+
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 最短流程：
 
 1. 在 Windows 上创建 `D:\HermesRAG`。
-2. 把 `src/paper-asset`、`scripts` 复制到 `D:\HermesRAG` 对应目录。
-3. 复制 `src/paper-asset/.env.example` 为 `D:\HermesRAG\paper-asset\.env`，填入真实 API Key 和 worker token。
-4. 安装 Python 依赖：
+2. 运行安装脚本：
+
+```powershell
+& D:\handoff\aaa\scripts\install-windows-local.ps1 -TargetRoot D:\HermesRAG -InstallPythonDeps
+```
+
+3. 编辑 `D:\HermesRAG\paper-asset\.env`，填入真实 API Key 和 worker token。
+4. 如果没有用安装脚本装依赖，可以手动安装：
 
 ```powershell
 pip install -r D:\HermesRAG\paper-asset\requirements.txt
