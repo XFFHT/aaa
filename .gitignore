@@ -1,0 +1,37 @@
+# Runtime data
+logs/
+outputs/
+work/
+downloads/
+teacher-files/
+ragflow-data/
+wsl/
+
+# Local databases and secrets
+*.db
+*.sqlite
+*.sqlite3
+*.key
+*.pem
+*.p12
+*.pfx
+*.env
+ragflow-api-key.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# .NET / frontend build output
+bin/
+obj/
+node_modules/
+dist/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/

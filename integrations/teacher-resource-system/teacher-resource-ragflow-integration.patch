@@ -1,0 +1,1879 @@
+diff --git a/backend/TeacherResource.Api/Controllers/RagFlowController.cs b/backend/TeacherResource.Api/Controllers/RagFlowController.cs
+new file mode 100644
+index 0000000..a803cc4
+--- /dev/null
++++ b/backend/TeacherResource.Api/Controllers/RagFlowController.cs
+@@ -0,0 +1,67 @@
++using Microsoft.AspNetCore.Mvc;
++using TeacherResource.Api.Common;
++using TeacherResource.Api.DTOs.RagFlow;
++using TeacherResource.Api.DTOs.Resources;
++using TeacherResource.Api.Services;
++
++namespace TeacherResource.Api.Controllers;
++
++[ApiController]
++[Route("api/ragflow")]
++public class RagFlowController(RagFlowService ragFlowService) : ControllerBase
++{
++    [HttpGet("status")]
++    public async Task<ApiResponse<RagFlowStatusDto>> GetStatus()
++    {
++        return await ragFlowService.GetStatusAsync();
++    }
++
++    [HttpGet("datasets")]
++    public async Task<ApiResponse<IReadOnlyList<RagFlowDatasetDto>>> GetDatasets(
++        [FromQuery] string? name,
++        [FromQuery] int pageSize = 30)
++    {
++        return await ragFlowService.ListDatasetsAsync(name, pageSize);
++    }
++
++    [HttpPost("datasets")]
++    public async Task<ApiResponse<RagFlowDatasetDto>> CreateDataset([FromBody] RagFlowCreateDatasetRequest request)
++    {
++        return await ragFlowService.CreateDatasetAsync(request);
++    }
++
++    [HttpPost("resources/{resourceId:long}/files/{fileId:long}/ingest")]
++    public async Task<ApiResponse<RagFlowIngestResultDto>> IngestResourceFile(
++        long resourceId,
++        long fileId,
++        [FromBody] RagFlowIngestResourceFileRequest request)
++    {
++        return await ragFlowService.IngestResourceFileAsync(resourceId, fileId, request);
++    }
++
++    [HttpPost("resources/{resourceId:long}/sync")]
++    public async Task<ApiResponse<ResourceAiMetadataDto>> SyncResource(long resourceId)
++    {
++        return await ragFlowService.SyncResourceAsync(resourceId);
++    }
++
++    [HttpGet("resources/{resourceId:long}/chunks")]
++    public async Task<ApiResponse<IReadOnlyList<RagFlowChunkDto>>> GetResourceChunks(long resourceId)
++    {
++        return await ragFlowService.GetResourceChunksAsync(resourceId);
++    }
++
++    [HttpPost("context-packs/{contextPackId:long}/ingest")]
++    public async Task<ApiResponse<RagFlowContextPackIngestResultDto>> IngestContextPack(
++        long contextPackId,
++        [FromBody] RagFlowIngestContextPackRequest request)
++    {
++        return await ragFlowService.IngestContextPackAsync(contextPackId, request);
++    }
++
++    [HttpPost("retrieve")]
++    public async Task<ApiResponse<RagFlowRetrieveResultDto>> Retrieve([FromBody] RagFlowRetrieveRequest request)
++    {
++        return await ragFlowService.RetrieveAsync(request);
++    }
++}
+diff --git a/backend/TeacherResource.Api/DTOs/RagFlow/RagFlowDtos.cs b/backend/TeacherResource.Api/DTOs/RagFlow/RagFlowDtos.cs
+new file mode 100644
+index 0000000..aa47e14
+--- /dev/null
++++ b/backend/TeacherResource.Api/DTOs/RagFlow/RagFlowDtos.cs
+@@ -0,0 +1,144 @@
++using System.Text.Json;
++
++namespace TeacherResource.Api.DTOs.RagFlow;
++
++public class RagFlowStatusDto
++{
++    public string BaseUrl { get; set; } = string.Empty;
++
++    public bool Online { get; set; }
++
++    public string Message { get; set; } = string.Empty;
++
++    public IReadOnlyList<RagFlowDatasetDto> Datasets { get; set; } = [];
++}
++
++public class RagFlowDatasetDto
++{
++    public string Id { get; set; } = string.Empty;
++
++    public string Name { get; set; } = string.Empty;
++
++    public string Description { get; set; } = string.Empty;
++
++    public string Permission { get; set; } = string.Empty;
++
++    public string ChunkMethod { get; set; } = string.Empty;
++}
++
++public class RagFlowDocumentDto
++{
++    public string Id { get; set; } = string.Empty;
++
++    public string Name { get; set; } = string.Empty;
++
++    public string Location { get; set; } = string.Empty;
++
++    public string Run { get; set; } = string.Empty;
++
++    public decimal Progress { get; set; }
++
++    public int ChunkCount { get; set; }
++
++    public int TokenCount { get; set; }
++}
++
++public class RagFlowChunkDto
++{
++    public string Id { get; set; } = string.Empty;
++
++    public string Content { get; set; } = string.Empty;
++
++    public bool Available { get; set; }
++
++    public decimal Similarity { get; set; }
++
++    public IReadOnlyList<string> Keywords { get; set; } = [];
++}
++
++public class RagFlowIngestResourceFileRequest
++{
++    public string? DatasetId { get; set; }
++
++    public string? DatasetName { get; set; }
++
++    public bool Parse { get; set; } = true;
++
++    public long? OperatorId { get; set; }
++}
++
++public class RagFlowIngestContextPackRequest
++{
++    public string? DatasetId { get; set; }
++
++    public string? DatasetName { get; set; }
++
++    public bool Parse { get; set; } = true;
++
++    public long? OperatorId { get; set; }
++}
++
++public class RagFlowCreateDatasetRequest
++{
++    public string Name { get; set; } = string.Empty;
++
++    public string Description { get; set; } = string.Empty;
++
++    public string Permission { get; set; } = "me";
++
++    public string ChunkMethod { get; set; } = string.Empty;
++}
++
++public class RagFlowRetrieveRequest
++{
++    public string Question { get; set; } = string.Empty;
++
++    public string? DatasetId { get; set; }
++
++    public string? DatasetName { get; set; }
++
++    public int TopK { get; set; } = 8;
++
++    public decimal SimilarityThreshold { get; set; } = 0.2m;
++
++    public bool Keyword { get; set; }
++}
++
++public class RagFlowIngestResultDto
++{
++    public long ResourceId { get; set; }
++
++    public long FileId { get; set; }
++
++    public string DatasetId { get; set; } = string.Empty;
++
++    public string DatasetName { get; set; } = string.Empty;
++
++    public string DocumentId { get; set; } = string.Empty;
++
++    public string DocumentName { get; set; } = string.Empty;
++
++    public string ParseStatus { get; set; } = string.Empty;
++
++    public string CallableStatus { get; set; } = string.Empty;
++
++    public string LocalArchivePath { get; set; } = string.Empty;
++
++    public RagFlowDocumentDto? Document { get; set; }
++}
++
++public class RagFlowContextPackIngestResultDto
++{
++    public long ContextPackId { get; set; }
++
++    public string DatasetId { get; set; } = string.Empty;
++
++    public string DatasetName { get; set; } = string.Empty;
++
++    public IReadOnlyList<RagFlowIngestResultDto> Resources { get; set; } = [];
++}
++
++public class RagFlowRetrieveResultDto
++{
++    public JsonElement Raw { get; set; }
++}
+diff --git a/backend/TeacherResource.Api/DTOs/Resources/ResourceDtos.cs b/backend/TeacherResource.Api/DTOs/Resources/ResourceDtos.cs
+index e18d2d1..87e8538 100644
+--- a/backend/TeacherResource.Api/DTOs/Resources/ResourceDtos.cs
++++ b/backend/TeacherResource.Api/DTOs/Resources/ResourceDtos.cs
+@@ -177,6 +177,22 @@ public class ResourceAiMetadataDto
+     public DateTime? LastParsedAt { get; set; }
+ 
+     public int WorkflowUsageCount { get; set; }
++
++    public string RagFlowDatasetId { get; set; } = string.Empty;
++
++    public string RagFlowDatasetName { get; set; } = string.Empty;
++
++    public string RagFlowDocumentId { get; set; } = string.Empty;
++
++    public string RagFlowDocumentName { get; set; } = string.Empty;
++
++    public string RagFlowRunStatus { get; set; } = string.Empty;
++
++    public int RagFlowChunkCount { get; set; }
++
++    public int RagFlowTokenCount { get; set; }
++
++    public string RagFlowError { get; set; } = string.Empty;
+ }
+ 
+ public class ResourceReviewLogDto
+diff --git a/backend/TeacherResource.Api/Data/AppDbContext.cs b/backend/TeacherResource.Api/Data/AppDbContext.cs
+index 05005a4..41e5db6 100644
+--- a/backend/TeacherResource.Api/Data/AppDbContext.cs
++++ b/backend/TeacherResource.Api/Data/AppDbContext.cs
+@@ -332,6 +332,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
+             entity.HasKey(x => x.ResourceId);
+             entity.Property(x => x.ParseStatus).HasMaxLength(20).IsRequired();
+             entity.Property(x => x.CallableStatus).HasMaxLength(20).IsRequired();
++            entity.Property(x => x.RagFlowDatasetId).HasMaxLength(80);
++            entity.Property(x => x.RagFlowDatasetName).HasMaxLength(200);
++            entity.Property(x => x.RagFlowDocumentId).HasMaxLength(80);
++            entity.Property(x => x.RagFlowDocumentName).HasMaxLength(255);
++            entity.Property(x => x.RagFlowRunStatus).HasMaxLength(30);
++            entity.Property(x => x.RagFlowError).HasMaxLength(1000);
+             entity.HasOne(x => x.Resource)
+                 .WithOne(x => x.AiMetadata)
+                 .HasForeignKey<ResourceAiMetadata>(x => x.ResourceId)
+diff --git a/backend/TeacherResource.Api/Migrations/20260528121500_AddRagFlowIntegrationMetadata.cs b/backend/TeacherResource.Api/Migrations/20260528121500_AddRagFlowIntegrationMetadata.cs
+new file mode 100644
+index 0000000..84461d7
+--- /dev/null
++++ b/backend/TeacherResource.Api/Migrations/20260528121500_AddRagFlowIntegrationMetadata.cs
+@@ -0,0 +1,85 @@
++using Microsoft.EntityFrameworkCore.Migrations;
++
++#nullable disable
++
++namespace TeacherResource.Api.Migrations;
++
++public partial class AddRagFlowIntegrationMetadata : Migration
++{
++    protected override void Up(MigrationBuilder migrationBuilder)
++    {
++        migrationBuilder.AddColumn<int>(
++            name: "RagFlowChunkCount",
++            table: "ResourceAiMetadata",
++            type: "int",
++            nullable: false,
++            defaultValue: 0);
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowDatasetId",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(80)",
++            maxLength: 80,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowDatasetName",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(200)",
++            maxLength: 200,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowDocumentId",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(80)",
++            maxLength: 80,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowDocumentName",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(255)",
++            maxLength: 255,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowError",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(1000)",
++            maxLength: 1000,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<string>(
++            name: "RagFlowRunStatus",
++            table: "ResourceAiMetadata",
++            type: "nvarchar(30)",
++            maxLength: 30,
++            nullable: false,
++            defaultValue: "");
++
++        migrationBuilder.AddColumn<int>(
++            name: "RagFlowTokenCount",
++            table: "ResourceAiMetadata",
++            type: "int",
++            nullable: false,
++            defaultValue: 0);
++    }
++
++    protected override void Down(MigrationBuilder migrationBuilder)
++    {
++        migrationBuilder.DropColumn(name: "RagFlowChunkCount", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowDatasetId", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowDatasetName", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowDocumentId", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowDocumentName", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowError", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowRunStatus", table: "ResourceAiMetadata");
++        migrationBuilder.DropColumn(name: "RagFlowTokenCount", table: "ResourceAiMetadata");
++    }
++}
+diff --git a/backend/TeacherResource.Api/Migrations/AppDbContextModelSnapshot.cs b/backend/TeacherResource.Api/Migrations/AppDbContextModelSnapshot.cs
+index 0f20900..1532496 100644
+--- a/backend/TeacherResource.Api/Migrations/AppDbContextModelSnapshot.cs
++++ b/backend/TeacherResource.Api/Migrations/AppDbContextModelSnapshot.cs
+@@ -424,6 +424,42 @@ namespace TeacherResource.Api.Migrations
+                         .HasMaxLength(20)
+                         .HasColumnType("nvarchar(20)");
+ 
++                    b.Property<int>("RagFlowChunkCount")
++                        .HasColumnType("int");
++
++                    b.Property<string>("RagFlowDatasetId")
++                        .IsRequired()
++                        .HasMaxLength(80)
++                        .HasColumnType("nvarchar(80)");
++
++                    b.Property<string>("RagFlowDatasetName")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("nvarchar(200)");
++
++                    b.Property<string>("RagFlowDocumentId")
++                        .IsRequired()
++                        .HasMaxLength(80)
++                        .HasColumnType("nvarchar(80)");
++
++                    b.Property<string>("RagFlowDocumentName")
++                        .IsRequired()
++                        .HasMaxLength(255)
++                        .HasColumnType("nvarchar(255)");
++
++                    b.Property<string>("RagFlowError")
++                        .IsRequired()
++                        .HasMaxLength(1000)
++                        .HasColumnType("nvarchar(1000)");
++
++                    b.Property<string>("RagFlowRunStatus")
++                        .IsRequired()
++                        .HasMaxLength(30)
++                        .HasColumnType("nvarchar(30)");
++
++                    b.Property<int>("RagFlowTokenCount")
++                        .HasColumnType("int");
++
+                     b.Property<DateTime>("UpdatedAt")
+                         .HasColumnType("datetime2");
+ 
+diff --git a/backend/TeacherResource.Api/Models/ResourceAiMetadata.cs b/backend/TeacherResource.Api/Models/ResourceAiMetadata.cs
+index bfa37c8..2b49a58 100644
+--- a/backend/TeacherResource.Api/Models/ResourceAiMetadata.cs
++++ b/backend/TeacherResource.Api/Models/ResourceAiMetadata.cs
+@@ -18,6 +18,22 @@ public class ResourceAiMetadata
+ 
+     public int WorkflowUsageCount { get; set; }
+ 
++    public string RagFlowDatasetId { get; set; } = string.Empty;
++
++    public string RagFlowDatasetName { get; set; } = string.Empty;
++
++    public string RagFlowDocumentId { get; set; } = string.Empty;
++
++    public string RagFlowDocumentName { get; set; } = string.Empty;
++
++    public string RagFlowRunStatus { get; set; } = string.Empty;
++
++    public int RagFlowChunkCount { get; set; }
++
++    public int RagFlowTokenCount { get; set; }
++
++    public string RagFlowError { get; set; } = string.Empty;
++
+     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+ 
+     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+diff --git a/backend/TeacherResource.Api/Options/RagFlowOptions.cs b/backend/TeacherResource.Api/Options/RagFlowOptions.cs
+new file mode 100644
+index 0000000..fcf4803
+--- /dev/null
++++ b/backend/TeacherResource.Api/Options/RagFlowOptions.cs
+@@ -0,0 +1,14 @@
++namespace TeacherResource.Api.Options;
++
++public class RagFlowOptions
++{
++    public string BaseUrl { get; set; } = "http://127.0.0.1:9380";
++
++    public string ApiKey { get; set; } = string.Empty;
++
++    public string ApiKeyFile { get; set; } = @"D:\HermesRAG\ragflow-api-key.txt";
++
++    public string TeacherFilesRoot { get; set; } = @"D:\HermesRAG\teacher-files";
++
++    public string DefaultChunkMethod { get; set; } = "naive";
++}
+diff --git a/backend/TeacherResource.Api/Program.cs b/backend/TeacherResource.Api/Program.cs
+index b40948b..c3eec42 100644
+--- a/backend/TeacherResource.Api/Program.cs
++++ b/backend/TeacherResource.Api/Program.cs
+@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
+ using Microsoft.Extensions.FileProviders;
+ using TeacherResource.Api.Common;
+ using TeacherResource.Api.Data;
++using TeacherResource.Api.Options;
+ using TeacherResource.Api.Services;
+ 
+ var builder = WebApplication.CreateBuilder(args);
+@@ -9,12 +10,16 @@ var builder = WebApplication.CreateBuilder(args);
+ builder.Services.AddControllers();
+ builder.Services.AddEndpointsApiExplorer();
+ builder.Services.AddSwaggerGen();
++builder.Services.Configure<RagFlowOptions>(builder.Configuration.GetSection("RagFlow"));
+ 
+ var localFrontendOrigins = new[]
+ {
+     "http://localhost:5173",
+     "http://localhost:5174",
+-    "http://localhost:5175"
++    "http://localhost:5175",
++    "http://127.0.0.1:5173",
++    "http://127.0.0.1:5174",
++    "http://127.0.0.1:5175"
+ };
+ 
+ var configuredFrontendOrigins = builder.Configuration
+@@ -38,7 +43,15 @@ builder.Services.AddCors(options =>
+ builder.Services.AddDbContext<AppDbContext>(options =>
+ {
+     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+-    options.UseSqlServer(connectionString);
++    var databaseProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
++    if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
++    {
++        options.UseSqlite(connectionString);
++    }
++    else
++    {
++        options.UseSqlServer(connectionString);
++    }
+ });
+ 
+ builder.Services.AddScoped<AuthService>();
+@@ -53,6 +66,7 @@ builder.Services.AddScoped<DashboardService>();
+ builder.Services.AddScoped<ContextPackService>();
+ builder.Services.AddScoped<WorkflowTemplateService>();
+ builder.Services.AddScoped<WorkflowRunService>();
++builder.Services.AddHttpClient<RagFlowService>();
+ 
+ var app = builder.Build();
+ 
+@@ -87,7 +101,14 @@ app.MapControllers();
+ using (var scope = app.Services.CreateScope())
+ {
+     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+-    await db.Database.MigrateAsync();
++    if (db.Database.IsSqlite())
++    {
++        await db.Database.EnsureCreatedAsync();
++    }
++    else
++    {
++        await db.Database.MigrateAsync();
++    }
+     await DbInitializer.InitializeAsync(db);
+ }
+ 
+diff --git a/backend/TeacherResource.Api/Services/RagFlowService.cs b/backend/TeacherResource.Api/Services/RagFlowService.cs
+new file mode 100644
+index 0000000..d9d214e
+--- /dev/null
++++ b/backend/TeacherResource.Api/Services/RagFlowService.cs
+@@ -0,0 +1,906 @@
++using System.Globalization;
++using System.Net.Http.Headers;
++using System.Text;
++using System.Text.Json;
++using System.Text.RegularExpressions;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.Options;
++using TeacherResource.Api.Common;
++using TeacherResource.Api.Data;
++using TeacherResource.Api.DTOs.RagFlow;
++using TeacherResource.Api.DTOs.Resources;
++using TeacherResource.Api.Models;
++using TeacherResource.Api.Options;
++
++namespace TeacherResource.Api.Services;
++
++public class RagFlowService(
++    HttpClient httpClient,
++    IOptions<RagFlowOptions> options,
++    AppDbContext db,
++    IWebHostEnvironment environment)
++{
++    private static readonly Regex InvalidPathChars = new(@"[<>:""/\\|?*\x00-\x1f]", RegexOptions.Compiled);
++    private readonly RagFlowOptions ragFlowOptions = options.Value;
++
++    public async Task<ApiResponse<RagFlowStatusDto>> GetStatusAsync()
++    {
++        try
++        {
++            var health = await SendAsync(HttpMethod.Get, "/api/v1/system/healthz", authorize: false);
++            var datasets = await ListDatasetsInternalAsync(null, 20);
++            return ApiResponse<RagFlowStatusDto>.Ok(new RagFlowStatusDto
++            {
++                BaseUrl = BaseUrl,
++                Online = true,
++                Message = health.RootElement.ToString(),
++                Datasets = datasets
++            });
++        }
++        catch (Exception ex)
++        {
++            return ApiResponse<RagFlowStatusDto>.Ok(new RagFlowStatusDto
++            {
++                BaseUrl = BaseUrl,
++                Online = false,
++                Message = ex.Message,
++                Datasets = []
++            });
++        }
++    }
++
++    public async Task<ApiResponse<IReadOnlyList<RagFlowDatasetDto>>> ListDatasetsAsync(string? name, int pageSize)
++    {
++        return ApiResponse<IReadOnlyList<RagFlowDatasetDto>>.Ok(await ListDatasetsInternalAsync(name, pageSize));
++    }
++
++    public async Task<ApiResponse<RagFlowDatasetDto>> CreateDatasetAsync(RagFlowCreateDatasetRequest request)
++    {
++        if (string.IsNullOrWhiteSpace(request.Name))
++        {
++            return ApiResponse<RagFlowDatasetDto>.Fail("Dataset name is required.");
++        }
++
++        var dataset = await EnsureDatasetAsync(
++            request.Name,
++            request.Description,
++            request.Permission,
++            request.ChunkMethod);
++
++        return ApiResponse<RagFlowDatasetDto>.Ok(dataset);
++    }
++
++    public async Task<ApiResponse<RagFlowIngestResultDto>> IngestResourceFileAsync(
++        long resourceId,
++        long fileId,
++        RagFlowIngestResourceFileRequest request)
++    {
++        var resource = await BuildResourceQuery()
++            .FirstOrDefaultAsync(x => x.Id == resourceId && !x.IsDeleted);
++        if (resource is null)
++        {
++            return ApiResponse<RagFlowIngestResultDto>.Fail("Resource not found.");
++        }
++
++        var file = resource.Files.FirstOrDefault(x => x.Id == fileId && !x.IsDeleted);
++        if (file is null)
++        {
++            return ApiResponse<RagFlowIngestResultDto>.Fail("Resource file not found.");
++        }
++
++        var operatorId = request.OperatorId.GetValueOrDefault(resource.UploaderId);
++        var operatorExists = await db.Users.AnyAsync(x =>
++            !x.IsDeleted && x.OrganizationId == resource.OrganizationId && x.Id == operatorId);
++        if (!operatorExists)
++        {
++            return ApiResponse<RagFlowIngestResultDto>.Fail("Operator not found in this organization.");
++        }
++
++        try
++        {
++            var result = await IngestFileCoreAsync(resource, file, request.DatasetId, request.DatasetName, request.Parse);
++            AddOperationLog(
++                resource.OrganizationId,
++                resource.Id,
++                operatorId,
++                "IngestToRagFlow",
++                $"Ingested file {file.FileName} to RAGFlow dataset {result.DatasetName}.");
++            await db.SaveChangesAsync();
++            return ApiResponse<RagFlowIngestResultDto>.Ok(result);
++        }
++        catch (Exception ex)
++        {
++            EnsureAiMetadata(resource);
++            resource.AiMetadata!.ParseStatus = "解析失败";
++            resource.AiMetadata.CallableStatus = "不可调用";
++            resource.AiMetadata.RagFlowError = ex.Message;
++            AddOperationLog(resource.OrganizationId, resource.Id, operatorId, "IngestToRagFlowFailed", ex.Message);
++            await db.SaveChangesAsync();
++            return ApiResponse<RagFlowIngestResultDto>.Fail(ex.Message);
++        }
++    }
++
++    public async Task<ApiResponse<RagFlowContextPackIngestResultDto>> IngestContextPackAsync(
++        long contextPackId,
++        RagFlowIngestContextPackRequest request)
++    {
++        var pack = await db.ContextPacks
++            .Include(x => x.ContextPackResources)
++                .ThenInclude(x => x.Resource)
++                    .ThenInclude(x => x!.Files)
++            .Include(x => x.ContextPackResources)
++                .ThenInclude(x => x.Resource)
++                    .ThenInclude(x => x!.AiMetadata)
++            .Include(x => x.ContextPackResources)
++                .ThenInclude(x => x.Resource)
++                    .ThenInclude(x => x!.Subject)
++            .Include(x => x.ContextPackResources)
++                .ThenInclude(x => x.Resource)
++                    .ThenInclude(x => x!.Grade)
++            .FirstOrDefaultAsync(x => x.Id == contextPackId && !x.IsDeleted);
++        if (pack is null)
++        {
++            return ApiResponse<RagFlowContextPackIngestResultDto>.Fail("Context pack not found.");
++        }
++
++        var operatorId = request.OperatorId.GetValueOrDefault(pack.CreatorId);
++        var operatorExists = await db.Users.AnyAsync(x =>
++            !x.IsDeleted && x.OrganizationId == pack.OrganizationId && x.Id == operatorId);
++        if (!operatorExists)
++        {
++            return ApiResponse<RagFlowContextPackIngestResultDto>.Fail("Operator not found in this organization.");
++        }
++
++        var datasetName = request.DatasetName;
++        if (string.IsNullOrWhiteSpace(request.DatasetId) && string.IsNullOrWhiteSpace(datasetName))
++        {
++            datasetName = pack.Name;
++        }
++
++        var results = new List<RagFlowIngestResultDto>();
++        var datasetId = request.DatasetId;
++        var resolvedDatasetName = datasetName ?? string.Empty;
++
++        try
++        {
++            foreach (var relation in pack.ContextPackResources.OrderBy(x => x.SortOrder))
++            {
++                var resource = relation.Resource;
++                if (resource is null || resource.IsDeleted)
++                {
++                    continue;
++                }
++
++                var file = resource.Files
++                    .Where(x => !x.IsDeleted)
++                    .OrderByDescending(x => x.UploadedAt)
++                    .FirstOrDefault();
++                if (file is null)
++                {
++                    continue;
++                }
++
++                var result = await IngestFileCoreAsync(resource, file, datasetId, datasetName, request.Parse);
++                datasetId = result.DatasetId;
++                resolvedDatasetName = result.DatasetName;
++                results.Add(result);
++            }
++
++            pack.CallableStatus = await RecalculatePackCallableStatusAsync(pack.Id);
++            AddOperationLog(
++                pack.OrganizationId,
++                null,
++                operatorId,
++                "IngestContextPackToRagFlow",
++                $"Ingested context pack {pack.Name} to RAGFlow dataset {resolvedDatasetName}.");
++            await db.SaveChangesAsync();
++
++            return ApiResponse<RagFlowContextPackIngestResultDto>.Ok(new RagFlowContextPackIngestResultDto
++            {
++                ContextPackId = pack.Id,
++                DatasetId = datasetId ?? string.Empty,
++                DatasetName = resolvedDatasetName,
++                Resources = results
++            });
++        }
++        catch (Exception ex)
++        {
++            AddOperationLog(pack.OrganizationId, null, operatorId, "IngestContextPackToRagFlowFailed", ex.Message);
++            await db.SaveChangesAsync();
++            return ApiResponse<RagFlowContextPackIngestResultDto>.Fail(ex.Message);
++        }
++    }
++
++    public async Task<ApiResponse<ResourceAiMetadataDto>> SyncResourceAsync(long resourceId)
++    {
++        var resource = await BuildResourceQuery()
++            .FirstOrDefaultAsync(x => x.Id == resourceId && !x.IsDeleted);
++        if (resource is null)
++        {
++            return ApiResponse<ResourceAiMetadataDto>.Fail("Resource not found.");
++        }
++
++        var metadata = resource.AiMetadata;
++        if (metadata is null || string.IsNullOrWhiteSpace(metadata.RagFlowDatasetId) || string.IsNullOrWhiteSpace(metadata.RagFlowDocumentId))
++        {
++            return ApiResponse<ResourceAiMetadataDto>.Fail("Resource has not been ingested to RAGFlow.");
++        }
++
++        try
++        {
++            var document = await GetDocumentAsync(metadata.RagFlowDatasetId, metadata.RagFlowDocumentId);
++            ApplyDocumentStatus(metadata, document);
++            metadata.RagFlowError = string.Empty;
++            await db.SaveChangesAsync();
++            return ApiResponse<ResourceAiMetadataDto>.Ok(ToAiMetadataDto(metadata));
++        }
++        catch (Exception ex)
++        {
++            metadata.ParseStatus = "解析失败";
++            metadata.CallableStatus = "不可调用";
++            metadata.RagFlowError = ex.Message;
++            await db.SaveChangesAsync();
++            return ApiResponse<ResourceAiMetadataDto>.Fail(ex.Message);
++        }
++    }
++
++    public async Task<ApiResponse<IReadOnlyList<RagFlowChunkDto>>> GetResourceChunksAsync(long resourceId)
++    {
++        var metadata = await db.ResourceAiMetadata.FirstOrDefaultAsync(x => x.ResourceId == resourceId);
++        if (metadata is null || string.IsNullOrWhiteSpace(metadata.RagFlowDatasetId) || string.IsNullOrWhiteSpace(metadata.RagFlowDocumentId))
++        {
++            return ApiResponse<IReadOnlyList<RagFlowChunkDto>>.Fail("Resource has not been ingested to RAGFlow.");
++        }
++
++        var chunks = await ListChunksAsync(metadata.RagFlowDatasetId, metadata.RagFlowDocumentId);
++        metadata.RagFlowChunkCount = chunks.Count;
++        await db.SaveChangesAsync();
++        return ApiResponse<IReadOnlyList<RagFlowChunkDto>>.Ok(chunks);
++    }
++
++    public async Task<ApiResponse<RagFlowRetrieveResultDto>> RetrieveAsync(RagFlowRetrieveRequest request)
++    {
++        if (string.IsNullOrWhiteSpace(request.Question))
++        {
++            return ApiResponse<RagFlowRetrieveResultDto>.Fail("Question is required.");
++        }
++
++        var datasetId = await ResolveDatasetIdAsync(request.DatasetId, request.DatasetName);
++        var payload = new
++        {
++            question = request.Question,
++            dataset_ids = new[] { datasetId },
++            page = 1,
++            page_size = Math.Clamp(request.TopK, 1, 30),
++            top_k = Math.Max(8, request.TopK),
++            similarity_threshold = request.SimilarityThreshold,
++            keyword = request.Keyword
++        };
++
++        var json = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
++        using var content = new ByteArrayContent(json);
++        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
++        var result = await SendAsync(HttpMethod.Post, "/api/v1/retrieval", content);
++        return ApiResponse<RagFlowRetrieveResultDto>.Ok(new RagFlowRetrieveResultDto { Raw = result.RootElement.Clone() });
++    }
++
++    private async Task<RagFlowIngestResultDto> IngestFileCoreAsync(
++        Resource resource,
++        ResourceFile file,
++        string? datasetId,
++        string? datasetName,
++        bool parse)
++    {
++        var fullPath = GetPhysicalFilePath(file);
++        if (!File.Exists(fullPath))
++        {
++            throw new FileNotFoundException($"Physical file not found: {fullPath}");
++        }
++
++        var dataset = string.IsNullOrWhiteSpace(datasetId)
++            ? await EnsureDatasetAsync(BuildDefaultDatasetName(resource, datasetName), BuildDatasetDescription(resource), "me", null)
++            : await GetDatasetByIdAsync(datasetId);
++
++        var archivePath = ArchiveTeacherFile(fullPath, file.FileName, dataset.Name);
++        var uploaded = await UploadDocumentAsync(dataset.Id, fullPath, file.FileName, file.MimeType);
++        var document = uploaded.FirstOrDefault();
++        if (document is null || string.IsNullOrWhiteSpace(document.Id))
++        {
++            throw new InvalidOperationException("RAGFlow did not return an uploaded document id.");
++        }
++
++        EnsureAiMetadata(resource);
++        var metadata = resource.AiMetadata!;
++        metadata.RagFlowDatasetId = dataset.Id;
++        metadata.RagFlowDatasetName = dataset.Name;
++        metadata.RagFlowDocumentId = document.Id;
++        metadata.RagFlowDocumentName = string.IsNullOrWhiteSpace(document.Name) ? file.FileName : document.Name;
++        metadata.RagFlowRunStatus = document.Run;
++        metadata.RagFlowError = string.Empty;
++        metadata.AiSummary = string.IsNullOrWhiteSpace(metadata.AiSummary)
++            ? $"已送入 RAGFlow 资料库「{dataset.Name}」，文件名：{file.FileName}。"
++            : metadata.AiSummary;
++
++        if (parse)
++        {
++            metadata.ParseStatus = "解析中";
++            metadata.CallableStatus = "不可调用";
++            await ParseDocumentsAsync(dataset.Id, [document.Id]);
++        }
++        else
++        {
++            ApplyDocumentStatus(metadata, document);
++        }
++
++        return new RagFlowIngestResultDto
++        {
++            ResourceId = resource.Id,
++            FileId = file.Id,
++            DatasetId = dataset.Id,
++            DatasetName = dataset.Name,
++            DocumentId = document.Id,
++            DocumentName = metadata.RagFlowDocumentName,
++            ParseStatus = metadata.ParseStatus,
++            CallableStatus = metadata.CallableStatus,
++            LocalArchivePath = archivePath,
++            Document = document
++        };
++    }
++
++    private async Task<IReadOnlyList<RagFlowDatasetDto>> ListDatasetsInternalAsync(string? name, int pageSize)
++    {
++        var parameters = new Dictionary<string, string?>
++        {
++            ["page"] = "1",
++            ["page_size"] = Math.Clamp(pageSize, 1, 100).ToString(CultureInfo.InvariantCulture)
++        };
++
++        if (!string.IsNullOrWhiteSpace(name))
++        {
++            parameters["name"] = name.Trim();
++        }
++
++        var data = await SendAsync(HttpMethod.Get, "/api/v1/datasets", parameters: parameters);
++        var payload = GetData(data.RootElement);
++        if (payload.ValueKind != JsonValueKind.Array)
++        {
++            return [];
++        }
++
++        return payload.EnumerateArray().Select(ToDatasetDto).ToList();
++    }
++
++    private async Task<RagFlowDatasetDto> EnsureDatasetAsync(string name, string description, string permission, string? chunkMethod)
++    {
++        var existing = await ListDatasetsInternalAsync(name, 100);
++        var matched = existing.FirstOrDefault(x => x.Name == name);
++        if (matched is not null)
++        {
++            return matched;
++        }
++
++        var payload = new
++        {
++            name,
++            description,
++            permission = string.IsNullOrWhiteSpace(permission) ? "me" : permission,
++            chunk_method = string.IsNullOrWhiteSpace(chunkMethod) ? ragFlowOptions.DefaultChunkMethod : chunkMethod
++        };
++
++        var json = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
++        using var content = new ByteArrayContent(json);
++        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
++        var data = await SendAsync(HttpMethod.Post, "/api/v1/datasets", content);
++        var created = GetData(data.RootElement);
++        if (created.ValueKind == JsonValueKind.Object)
++        {
++            return ToDatasetDto(created);
++        }
++
++        var afterCreate = await ListDatasetsInternalAsync(name, 100);
++        return afterCreate.First(x => x.Name == name);
++    }
++
++    private async Task<RagFlowDatasetDto> GetDatasetByIdAsync(string datasetId)
++    {
++        var datasets = await ListDatasetsInternalAsync(null, 100);
++        var dataset = datasets.FirstOrDefault(x => x.Id == datasetId);
++        if (dataset is null)
++        {
++            throw new InvalidOperationException($"RAGFlow dataset not found: {datasetId}");
++        }
++
++        return dataset;
++    }
++
++    private async Task<string> ResolveDatasetIdAsync(string? datasetId, string? datasetName)
++    {
++        if (!string.IsNullOrWhiteSpace(datasetId))
++        {
++            return datasetId.Trim();
++        }
++
++        if (string.IsNullOrWhiteSpace(datasetName))
++        {
++            throw new InvalidOperationException("Dataset id or dataset name is required.");
++        }
++
++        var datasets = await ListDatasetsInternalAsync(datasetName, 100);
++        return datasets.FirstOrDefault(x => x.Name == datasetName)?.Id
++            ?? throw new InvalidOperationException($"RAGFlow dataset not found: {datasetName}");
++    }
++
++    private async Task<IReadOnlyList<RagFlowDocumentDto>> UploadDocumentAsync(
++        string datasetId,
++        string fullPath,
++        string fileName,
++        string mimeType)
++    {
++        await using var stream = File.OpenRead(fullPath);
++        using var fileContent = new StreamContent(stream);
++        fileContent.Headers.ContentType = new MediaTypeHeaderValue(
++            string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType);
++
++        using var form = new MultipartFormDataContent();
++        form.Add(fileContent, "file", fileName);
++
++        var data = await SendAsync(HttpMethod.Post, $"/api/v1/datasets/{datasetId}/documents", form, timeoutSeconds: 600);
++        var payload = GetData(data.RootElement);
++        if (payload.ValueKind != JsonValueKind.Array)
++        {
++            return [];
++        }
++
++        return payload.EnumerateArray().Select(ToDocumentDto).ToList();
++    }
++
++    private async Task ParseDocumentsAsync(string datasetId, IReadOnlyList<string> documentIds)
++    {
++        var payload = new { document_ids = documentIds };
++        var json = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
++        using var content = new ByteArrayContent(json);
++        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
++        await SendAsync(HttpMethod.Post, $"/api/v1/datasets/{datasetId}/chunks", content, timeoutSeconds: 300);
++    }
++
++    private async Task<RagFlowDocumentDto> GetDocumentAsync(string datasetId, string documentId)
++    {
++        var data = await SendAsync(HttpMethod.Get, $"/api/v1/datasets/{datasetId}/documents/{documentId}");
++        var payload = GetData(data.RootElement);
++        return ToDocumentDto(payload);
++    }
++
++    private async Task<IReadOnlyList<RagFlowChunkDto>> ListChunksAsync(string datasetId, string documentId)
++    {
++        var parameters = new Dictionary<string, string?>
++        {
++            ["page"] = "1",
++            ["page_size"] = "100"
++        };
++        var data = await SendAsync(
++            HttpMethod.Get,
++            $"/api/v1/datasets/{datasetId}/documents/{documentId}/chunks",
++            parameters: parameters);
++        var payload = GetData(data.RootElement);
++        var rows = payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("chunks", out var chunks)
++            ? chunks
++            : payload;
++
++        if (rows.ValueKind != JsonValueKind.Array)
++        {
++            return [];
++        }
++
++        return rows.EnumerateArray().Select(ToChunkDto).ToList();
++    }
++
++    private async Task<JsonDocument> SendAsync(
++        HttpMethod method,
++        string path,
++        HttpContent? content = null,
++        IDictionary<string, string?>? parameters = null,
++        bool authorize = true,
++        int timeoutSeconds = 120)
++    {
++        var url = BuildUrl(path, parameters);
++        using var request = new HttpRequestMessage(method, url);
++        if (authorize)
++        {
++            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ResolveApiKey());
++        }
++
++        if (content is not null)
++        {
++            request.Content = content;
++        }
++
++        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
++        using var response = await httpClient.SendAsync(request, cts.Token);
++        var body = await response.Content.ReadAsStringAsync(cts.Token);
++        if (!response.IsSuccessStatusCode)
++        {
++            throw new InvalidOperationException($"RAGFlow HTTP {(int)response.StatusCode}: {body}");
++        }
++
++        var document = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
++        var root = document.RootElement;
++        if (root.ValueKind == JsonValueKind.Object &&
++            root.TryGetProperty("code", out var code) &&
++            code.ValueKind == JsonValueKind.Number &&
++            code.GetInt32() != 0)
++        {
++            var message = root.TryGetProperty("message", out var msg) ? msg.ToString() : root.ToString();
++            document.Dispose();
++            throw new InvalidOperationException($"RAGFlow API error: {message}");
++        }
++
++        return document;
++    }
++
++    private string BuildUrl(string path, IDictionary<string, string?>? parameters)
++    {
++        var builder = new StringBuilder();
++        builder.Append(BaseUrl);
++        builder.Append(path.StartsWith('/') ? path : $"/{path}");
++        if (parameters is { Count: > 0 })
++        {
++            var query = parameters
++                .Where(x => !string.IsNullOrWhiteSpace(x.Value))
++                .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}");
++            var joined = string.Join("&", query);
++            if (!string.IsNullOrWhiteSpace(joined))
++            {
++                builder.Append('?').Append(joined);
++            }
++        }
++
++        return builder.ToString();
++    }
++
++    private string BaseUrl => (ragFlowOptions.BaseUrl ?? "http://127.0.0.1:9380").TrimEnd('/');
++
++    private string ResolveApiKey()
++    {
++        if (!string.IsNullOrWhiteSpace(ragFlowOptions.ApiKey))
++        {
++            return ragFlowOptions.ApiKey.Trim();
++        }
++
++        if (!string.IsNullOrWhiteSpace(ragFlowOptions.ApiKeyFile) && File.Exists(ragFlowOptions.ApiKeyFile))
++        {
++            return File.ReadAllText(ragFlowOptions.ApiKeyFile).Trim();
++        }
++
++        throw new InvalidOperationException("RAGFlow API key is missing. Configure RagFlow:ApiKey or RagFlow:ApiKeyFile.");
++    }
++
++    private static JsonElement GetData(JsonElement root)
++    {
++        return root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var data) ? data : root;
++    }
++
++    private static RagFlowDatasetDto ToDatasetDto(JsonElement item)
++    {
++        return new RagFlowDatasetDto
++        {
++            Id = GetString(item, "id"),
++            Name = GetString(item, "name"),
++            Description = GetString(item, "description"),
++            Permission = GetString(item, "permission"),
++            ChunkMethod = GetString(item, "chunk_method")
++        };
++    }
++
++    private static RagFlowDocumentDto ToDocumentDto(JsonElement item)
++    {
++        return new RagFlowDocumentDto
++        {
++            Id = GetString(item, "id"),
++            Name = GetString(item, "name"),
++            Location = GetString(item, "location"),
++            Run = NormalizeRunStatus(GetString(item, "run")),
++            Progress = GetDecimal(item, "progress"),
++            ChunkCount = GetInt(item, "chunk_count", "chunk_num"),
++            TokenCount = GetInt(item, "token_count", "token_num")
++        };
++    }
++
++    private static RagFlowChunkDto ToChunkDto(JsonElement item)
++    {
++        return new RagFlowChunkDto
++        {
++            Id = GetString(item, "id"),
++            Content = FirstNonEmpty(GetString(item, "content"), GetString(item, "text")),
++            Available = GetBool(item, "available"),
++            Similarity = GetDecimal(item, "similarity", "score"),
++            Keywords = GetStringArray(item, "important_kwd", "important_keywords")
++        };
++    }
++
++    private static string GetString(JsonElement item, string name)
++    {
++        if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(name, out var value))
++        {
++            return string.Empty;
++        }
++
++        return value.ValueKind switch
++        {
++            JsonValueKind.String => value.GetString() ?? string.Empty,
++            JsonValueKind.Number => value.ToString(),
++            JsonValueKind.True => "true",
++            JsonValueKind.False => "false",
++            _ => string.Empty
++        };
++    }
++
++    private static int GetInt(JsonElement item, params string[] names)
++    {
++        foreach (var name in names)
++        {
++            if (item.ValueKind == JsonValueKind.Object &&
++                item.TryGetProperty(name, out var value) &&
++                value.TryGetInt32(out var result))
++            {
++                return result;
++            }
++        }
++
++        return 0;
++    }
++
++    private static decimal GetDecimal(JsonElement item, params string[] names)
++    {
++        foreach (var name in names)
++        {
++            if (item.ValueKind == JsonValueKind.Object &&
++                item.TryGetProperty(name, out var value) &&
++                value.TryGetDecimal(out var result))
++            {
++                return result;
++            }
++        }
++
++        return 0;
++    }
++
++    private static bool GetBool(JsonElement item, string name)
++    {
++        if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(name, out var value))
++        {
++            return false;
++        }
++
++        return value.ValueKind switch
++        {
++            JsonValueKind.True => true,
++            JsonValueKind.False => false,
++            JsonValueKind.Number => value.TryGetInt32(out var number) && number != 0,
++            JsonValueKind.String => bool.TryParse(value.GetString(), out var parsed) && parsed,
++            _ => false
++        };
++    }
++
++    private static IReadOnlyList<string> GetStringArray(JsonElement item, params string[] names)
++    {
++        foreach (var name in names)
++        {
++            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(name, out var value))
++            {
++                continue;
++            }
++
++            if (value.ValueKind == JsonValueKind.Array)
++            {
++                return value.EnumerateArray()
++                    .Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() ?? string.Empty : x.ToString())
++                    .Where(x => !string.IsNullOrWhiteSpace(x))
++                    .ToList();
++            }
++
++            if (value.ValueKind == JsonValueKind.String)
++            {
++                return value.GetString()?
++                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
++                    .ToList() ?? [];
++            }
++        }
++
++        return [];
++    }
++
++    private static string FirstNonEmpty(params string[] values)
++    {
++        return values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? string.Empty;
++    }
++
++    private static string NormalizeRunStatus(string run)
++    {
++        return run switch
++        {
++            "0" => "UNSTART",
++            "1" => "RUNNING",
++            "2" => "CANCEL",
++            "3" => "DONE",
++            "4" => "FAIL",
++            _ => run
++        };
++    }
++
++    private static void ApplyDocumentStatus(ResourceAiMetadata metadata, RagFlowDocumentDto document)
++    {
++        metadata.RagFlowRunStatus = document.Run;
++        metadata.RagFlowChunkCount = document.ChunkCount;
++        metadata.RagFlowTokenCount = document.TokenCount;
++
++        if (document.Run == "DONE")
++        {
++            metadata.ParseStatus = "已解析";
++            metadata.CallableStatus = "可调用";
++            metadata.LastParsedAt = DateTime.UtcNow;
++            return;
++        }
++
++        if (document.Run == "RUNNING")
++        {
++            metadata.ParseStatus = "解析中";
++            metadata.CallableStatus = "不可调用";
++            return;
++        }
++
++        if (document.Run is "FAIL" or "CANCEL")
++        {
++            metadata.ParseStatus = "解析失败";
++            metadata.CallableStatus = "不可调用";
++            return;
++        }
++
++        metadata.ParseStatus = "未解析";
++        metadata.CallableStatus = "不可调用";
++    }
++
++    private string ArchiveTeacherFile(string fullPath, string originalFileName, string datasetName)
++    {
++        if (string.IsNullOrWhiteSpace(ragFlowOptions.TeacherFilesRoot))
++        {
++            return string.Empty;
++        }
++
++        var datasetDir = Path.Combine(ragFlowOptions.TeacherFilesRoot, SafeName(datasetName, "默认资料库"));
++        Directory.CreateDirectory(datasetDir);
++        var target = UniquePath(datasetDir, SafeName(originalFileName, "uploaded-file"));
++        File.Copy(fullPath, target);
++        return target;
++    }
++
++    private static string SafeName(string value, string fallback)
++    {
++        var safe = InvalidPathChars.Replace(value ?? string.Empty, "_").Trim().Trim('.');
++        return string.IsNullOrWhiteSpace(safe) ? fallback : safe[..Math.Min(safe.Length, 120)];
++    }
++
++    private static string UniquePath(string directory, string fileName)
++    {
++        var target = Path.Combine(directory, fileName);
++        if (!File.Exists(target))
++        {
++            return target;
++        }
++
++        var stem = Path.GetFileNameWithoutExtension(fileName);
++        var ext = Path.GetExtension(fileName);
++        var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
++        for (var index = 1; index < 1000; index++)
++        {
++            var candidate = Path.Combine(directory, $"{stem}_{stamp}_{index}{ext}");
++            if (!File.Exists(candidate))
++            {
++                return candidate;
++            }
++        }
++
++        throw new InvalidOperationException($"Could not allocate archive file name for {fileName}");
++    }
++
++    private string GetPhysicalFilePath(ResourceFile file)
++    {
++        var normalized = file.StoragePath.Replace('/', Path.DirectorySeparatorChar);
++        return Path.Combine(environment.ContentRootPath, normalized);
++    }
++
++    private static string BuildDefaultDatasetName(Resource resource, string? requestedName)
++    {
++        if (!string.IsNullOrWhiteSpace(requestedName))
++        {
++            return requestedName.Trim();
++        }
++
++        var grade = resource.Grade?.Name ?? string.Empty;
++        var subject = resource.Subject?.Name ?? string.Empty;
++        var prefix = $"{grade}{subject}".Trim();
++        return string.IsNullOrWhiteSpace(prefix) ? "默认资料库" : $"{prefix}资料库";
++    }
++
++    private static string BuildDatasetDescription(Resource resource)
++    {
++        var subject = resource.Subject?.Name ?? string.Empty;
++        var grade = resource.Grade?.Name ?? string.Empty;
++        return $"由 TeacherResource 自动创建，用于存放{grade}{subject}教学资料、试卷、教案、课件和解析内容。";
++    }
++
++    private static void EnsureAiMetadata(Resource resource)
++    {
++        resource.AiMetadata ??= new ResourceAiMetadata
++        {
++            ResourceId = resource.Id,
++            ParseStatus = "未解析",
++            CallableStatus = "不可调用"
++        };
++    }
++
++    private async Task<string> RecalculatePackCallableStatusAsync(long contextPackId)
++    {
++        var resources = await db.ContextPackResources
++            .Where(x => x.ContextPackId == contextPackId && x.Resource != null && !x.Resource.IsDeleted)
++            .Select(x => x.Resource!)
++            .Include(x => x.AiMetadata)
++            .ToListAsync();
++
++        if (resources.Count == 0)
++        {
++            return "不可调用";
++        }
++
++        return resources.All(x => x.AiMetadata != null && x.AiMetadata.CallableStatus == "可调用")
++            ? "可调用"
++            : "不可调用";
++    }
++
++    private static ResourceAiMetadataDto ToAiMetadataDto(ResourceAiMetadata metadata)
++    {
++        return new ResourceAiMetadataDto
++        {
++            ParseStatus = metadata.ParseStatus,
++            CallableStatus = metadata.CallableStatus,
++            AiSummary = metadata.AiSummary,
++            KeySnippet = metadata.KeySnippet,
++            LastParsedAt = metadata.LastParsedAt,
++            WorkflowUsageCount = metadata.WorkflowUsageCount,
++            RagFlowDatasetId = metadata.RagFlowDatasetId,
++            RagFlowDatasetName = metadata.RagFlowDatasetName,
++            RagFlowDocumentId = metadata.RagFlowDocumentId,
++            RagFlowDocumentName = metadata.RagFlowDocumentName,
++            RagFlowRunStatus = metadata.RagFlowRunStatus,
++            RagFlowChunkCount = metadata.RagFlowChunkCount,
++            RagFlowTokenCount = metadata.RagFlowTokenCount,
++            RagFlowError = metadata.RagFlowError
++        };
++    }
++
++    private IQueryable<Resource> BuildResourceQuery()
++    {
++        return db.Resources
++            .Include(x => x.Subject)
++            .Include(x => x.Grade)
++            .Include(x => x.Files)
++            .Include(x => x.AiMetadata)
++            .Where(x => !x.IsDeleted);
++    }
++
++    private void AddOperationLog(long organizationId, long? resourceId, long operatorId, string action, string description)
++    {
++        db.OperationLogs.Add(new OperationLog
++        {
++            OrganizationId = organizationId,
++            ResourceId = resourceId,
++            OperatorId = operatorId,
++            OperationType = action,
++            OperationContent = description.Length > 1000 ? description[..1000] : description
++        });
++    }
++
++    private static readonly JsonSerializerOptions JsonOptions = new()
++    {
++        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
++    };
++}
+diff --git a/backend/TeacherResource.Api/Services/ResourceService.cs b/backend/TeacherResource.Api/Services/ResourceService.cs
+index c5cecea..b36785f 100644
+--- a/backend/TeacherResource.Api/Services/ResourceService.cs
++++ b/backend/TeacherResource.Api/Services/ResourceService.cs
+@@ -455,7 +455,15 @@ public class ResourceService(AppDbContext db, IWebHostEnvironment environment)
+                 AiSummary = resource.AiMetadata?.AiSummary ?? string.Empty,
+                 KeySnippet = resource.AiMetadata?.KeySnippet ?? string.Empty,
+                 LastParsedAt = resource.AiMetadata?.LastParsedAt,
+-                WorkflowUsageCount = resource.AiMetadata?.WorkflowUsageCount ?? 0
++                WorkflowUsageCount = resource.AiMetadata?.WorkflowUsageCount ?? 0,
++                RagFlowDatasetId = resource.AiMetadata?.RagFlowDatasetId ?? string.Empty,
++                RagFlowDatasetName = resource.AiMetadata?.RagFlowDatasetName ?? string.Empty,
++                RagFlowDocumentId = resource.AiMetadata?.RagFlowDocumentId ?? string.Empty,
++                RagFlowDocumentName = resource.AiMetadata?.RagFlowDocumentName ?? string.Empty,
++                RagFlowRunStatus = resource.AiMetadata?.RagFlowRunStatus ?? string.Empty,
++                RagFlowChunkCount = resource.AiMetadata?.RagFlowChunkCount ?? 0,
++                RagFlowTokenCount = resource.AiMetadata?.RagFlowTokenCount ?? 0,
++                RagFlowError = resource.AiMetadata?.RagFlowError ?? string.Empty
+             },
+             OperationLogs = resource.OperationLogs
+                 .OrderByDescending(x => x.CreatedAt)
+diff --git a/backend/TeacherResource.Api/TeacherResource.Api.csproj b/backend/TeacherResource.Api/TeacherResource.Api.csproj
+index eb0e77d..648c048 100644
+--- a/backend/TeacherResource.Api/TeacherResource.Api.csproj
++++ b/backend/TeacherResource.Api/TeacherResource.Api.csproj
+@@ -12,6 +12,7 @@
+       <PrivateAssets>all</PrivateAssets>
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+     </PackageReference>
++    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">
+       <PrivateAssets>all</PrivateAssets>
+diff --git a/backend/TeacherResource.Api/appsettings.json b/backend/TeacherResource.Api/appsettings.json
+index 2fffcaa..90c5b06 100644
+--- a/backend/TeacherResource.Api/appsettings.json
++++ b/backend/TeacherResource.Api/appsettings.json
+@@ -2,6 +2,12 @@
+   "ConnectionStrings": {
+     "DefaultConnection": "Server=localhost,1433;Database=TeacherResourceDb;User Id=sa;Password=YOUR_SA_PASSWORD;TrustServerCertificate=True;"
+   },
++  "RagFlow": {
++    "BaseUrl": "http://127.0.0.1:9380",
++    "ApiKeyFile": "D:\\HermesRAG\\ragflow-api-key.txt",
++    "TeacherFilesRoot": "D:\\HermesRAG\\teacher-files",
++    "DefaultChunkMethod": "naive"
++  },
+   "Logging": {
+     "LogLevel": {
+       "Default": "Information",
+diff --git a/docs/HERMES_RAGFLOW_BRIDGE.md b/docs/HERMES_RAGFLOW_BRIDGE.md
+new file mode 100644
+index 0000000..4251214
+--- /dev/null
++++ b/docs/HERMES_RAGFLOW_BRIDGE.md
+@@ -0,0 +1,63 @@
++# Hermes / RAGFlow 对接说明
++
++本项目已经补上 TeacherResource -> RAGFlow -> Hermes 的第一版链路。
++
++## 本地后台
++
++TeacherResource 后端读取：
++
++- `RagFlow:BaseUrl`，默认 `http://127.0.0.1:9380`
++- `RagFlow:ApiKeyFile`，默认 `D:\HermesRAG\ragflow-api-key.txt`
++- `RagFlow:TeacherFilesRoot`，默认 `D:\HermesRAG\teacher-files`
++
++资源详情页可以对单个文件执行：
++
++1. 入库 RAGFlow
++2. 同步 RAGFlow 解析状态
++3. 查看 RAGFlow 切片
++
++上下文包页可以把一组资源整体入库到同一个 RAGFlow 资料库。
++
++## 后端接口
++
++- `GET /api/ragflow/status`
++- `GET /api/ragflow/datasets`
++- `POST /api/ragflow/datasets`
++- `POST /api/ragflow/resources/{resourceId}/files/{fileId}/ingest`
++- `POST /api/ragflow/resources/{resourceId}/sync`
++- `GET /api/ragflow/resources/{resourceId}/chunks`
++- `POST /api/ragflow/context-packs/{contextPackId}/ingest`
++- `POST /api/ragflow/retrieve`
++
++## Hermes 访问方式
++
++本机脚本 `D:\HermesRAG\scripts\start-ragflow-tunnel.ps1` 已增加：
++
++```text
++127.0.0.1:15128 on server -> 127.0.0.1:5128 on this PC
++```
++
++所以 Hermes 服务器上的 MCP 使用：
++
++```text
++TEACHER_RESOURCE_API_URL=http://127.0.0.1:15128/api
++```
++
++可用 MCP 工具：
++
++- `teacher_resource_status`
++- `teacher_resource_list_resources`
++- `teacher_resource_ingest_file`
++- `teacher_resource_sync_resource`
++- `teacher_resource_chunks`
++- `teacher_resource_ingest_context_pack`
++
++## 使用顺序
++
++1. 启动 RAGFlow：`D:\HermesRAG\scripts\start-ragflow.ps1`
++2. 启动反向隧道：`D:\HermesRAG\scripts\start-ragflow-tunnel.ps1`
++3. 启动 TeacherResource 后端：`dotnet run`，监听 `http://127.0.0.1:5128`
++4. 启动前端：`npm run dev`
++5. 在资源详情页上传文件，点击“入库 RAGFlow”
++6. 等待解析后点击“同步 RAGFlow 状态”或“查看切片”
++
+diff --git a/frontend/teacher-resource-web/src/api/ragflow.js b/frontend/teacher-resource-web/src/api/ragflow.js
+new file mode 100644
+index 0000000..722861a
+--- /dev/null
++++ b/frontend/teacher-resource-web/src/api/ragflow.js
+@@ -0,0 +1,39 @@
++import request from './request'
++
++function unwrapApiResponse(response, fallbackMessage) {
++  if (!response?.success) {
++    throw new Error(response?.message || fallbackMessage)
++  }
++
++  return response.data
++}
++
++export async function getRagFlowStatus() {
++  const response = await request.get('/ragflow/status')
++  return unwrapApiResponse(response, '获取 RAGFlow 状态失败')
++}
++
++export async function getRagFlowDatasets(params) {
++  const response = await request.get('/ragflow/datasets', { params })
++  return unwrapApiResponse(response, '获取 RAGFlow 资料库失败')
++}
++
++export async function ingestResourceFile(resourceId, fileId, payload) {
++  const response = await request.post(`/ragflow/resources/${resourceId}/files/${fileId}/ingest`, payload)
++  return unwrapApiResponse(response, '入库 RAGFlow 失败')
++}
++
++export async function syncResourceRagFlow(resourceId) {
++  const response = await request.post(`/ragflow/resources/${resourceId}/sync`)
++  return unwrapApiResponse(response, '同步 RAGFlow 状态失败')
++}
++
++export async function getResourceRagFlowChunks(resourceId) {
++  const response = await request.get(`/ragflow/resources/${resourceId}/chunks`)
++  return unwrapApiResponse(response, '获取 RAGFlow 切片失败')
++}
++
++export async function ingestContextPack(contextPackId, payload) {
++  const response = await request.post(`/ragflow/context-packs/${contextPackId}/ingest`, payload)
++  return unwrapApiResponse(response, '上下文包入库 RAGFlow 失败')
++}
+diff --git a/frontend/teacher-resource-web/src/views/ContextPacksView.vue b/frontend/teacher-resource-web/src/views/ContextPacksView.vue
+index 98f5ff1..a4e82c4 100644
+--- a/frontend/teacher-resource-web/src/views/ContextPacksView.vue
++++ b/frontend/teacher-resource-web/src/views/ContextPacksView.vue
+@@ -59,11 +59,19 @@
+             <el-tag :type="callableStatusType(row.callableStatus)">{{ row.callableStatus || '-' }}</el-tag>
+           </template>
+         </el-table-column>
+-        <el-table-column label="操作" width="340" fixed="right">
++        <el-table-column label="操作" width="430" fixed="right">
+           <template #default="{ row }">
+             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+             <el-button link type="primary" @click="openForm(row)">编辑</el-button>
+             <el-button link type="success" @click="openAddResource(row)">添加资源</el-button>
++            <el-button
++              link
++              type="success"
++              :loading="ragflowIngestingPackId === row.id"
++              @click="ingestPackToRagFlow(row)"
++            >
++              入库 RAGFlow
++            </el-button>
+             <el-button link type="warning" @click="openSubmitWorkflow(row)">提交工作流</el-button>
+             <el-button link type="danger" @click="confirmDelete(row)">删除</el-button>
+           </template>
+@@ -233,6 +241,7 @@ import PageHeader from '../components/PageHeader.vue'
+ import { getGrades, getSubjects } from '../api/basicData'
+ import { getStoredUser } from '../api/auth'
+ import { getResources } from '../api/resources'
++import { ingestContextPack } from '../api/ragflow'
+ import { callableStatusType, parseStatusType } from '../utils/status'
+ import {
+   addContextPackResources,
+@@ -251,6 +260,7 @@ const detailLoading = ref(false)
+ const saving = ref(false)
+ const resourceSaving = ref(false)
+ const submitting = ref(false)
++const ragflowIngestingPackId = ref(null)
+ const loadError = ref('')
+ const rows = ref([])
+ const subjectOptions = ref([])
+@@ -506,6 +516,36 @@ async function confirmAddResources() {
+   }
+ }
+ 
++async function ingestPackToRagFlow(row) {
++  try {
++    const { value } = await ElMessageBox.prompt('输入要入库的 RAGFlow 资料库名称', '上下文包入库 RAGFlow', {
++      confirmButtonText: '开始入库',
++      cancelButtonText: '取消',
++      inputValue: row.name,
++      inputPattern: /\S+/,
++      inputErrorMessage: '资料库名称不能为空'
++    })
++
++    ragflowIngestingPackId.value = row.id
++    const result = await ingestContextPack(row.id, {
++      datasetName: value.trim(),
++      parse: true,
++      operatorId: getCurrentUserId()
++    })
++    ElMessage.success(`已提交 ${result.resources?.length || 0} 个资源到 RAGFlow`)
++    await loadPacks()
++    if (currentPack.value?.id === row.id) {
++      await fetchPackDetail(row.id)
++    }
++  } catch (error) {
++    if (error !== 'cancel' && error !== 'close') {
++      ElMessage.error(error.message || '上下文包入库 RAGFlow 失败')
++    }
++  } finally {
++    ragflowIngestingPackId.value = null
++  }
++}
++
+ async function confirmRemoveResource(resource) {
+   try {
+     await ElMessageBox.confirm(`确认从上下文包中移除“${resource.title}”？`, '移除资源', {
+diff --git a/frontend/teacher-resource-web/src/views/resources/ResourceDetailView.vue b/frontend/teacher-resource-web/src/views/resources/ResourceDetailView.vue
+index 693778e..546040a 100644
+--- a/frontend/teacher-resource-web/src/views/resources/ResourceDetailView.vue
++++ b/frontend/teacher-resource-web/src/views/resources/ResourceDetailView.vue
+@@ -129,7 +129,11 @@
+         <div class="section-title-row">
+           <div>
+             <h2>AI 可调用信息</h2>
+-            <p>展示后端已保存的解析状态、可调用状态和摘要字段；当前阶段不执行真实 AI 或 OCR。</p>
++            <p>展示 RAGFlow 入库、解析状态、切片数量和后续可调用状态。</p>
++          </div>
++          <div class="toolbar">
++            <el-button :loading="ragflowSyncing" @click="syncRagFlowStatus">同步 RAGFlow 状态</el-button>
++            <el-button type="primary" :loading="chunksLoading" @click="openChunksDrawer">查看切片</el-button>
+           </div>
+         </div>
+         <el-descriptions :column="3" border>
+@@ -149,6 +153,24 @@
+           <el-descriptions-item label="关联工作流次数">
+             {{ resource.aiMetadata.workflowUsageCount ?? 0 }}
+           </el-descriptions-item>
++          <el-descriptions-item label="RAGFlow 资料库">
++            {{ resource.aiMetadata.ragFlowDatasetName || resource.aiMetadata.ragFlowDatasetId || '-' }}
++          </el-descriptions-item>
++          <el-descriptions-item label="RAGFlow 文档">
++            {{ resource.aiMetadata.ragFlowDocumentName || resource.aiMetadata.ragFlowDocumentId || '-' }}
++          </el-descriptions-item>
++          <el-descriptions-item label="RAGFlow 状态">
++            {{ resource.aiMetadata.ragFlowRunStatus || '-' }}
++          </el-descriptions-item>
++          <el-descriptions-item label="切片数">
++            {{ resource.aiMetadata.ragFlowChunkCount ?? 0 }}
++          </el-descriptions-item>
++          <el-descriptions-item label="Token 数">
++            {{ resource.aiMetadata.ragFlowTokenCount ?? 0 }}
++          </el-descriptions-item>
++          <el-descriptions-item label="RAGFlow 错误">
++            {{ resource.aiMetadata.ragFlowError || '-' }}
++          </el-descriptions-item>
+           <el-descriptions-item label="资料摘要" :span="3">
+             {{ resource.aiMetadata.aiSummary || '-' }}
+           </el-descriptions-item>
+@@ -173,9 +195,17 @@
+           <el-table-column label="上传时间" width="170">
+             <template #default="{ row }">{{ formatDate(row.uploadedAt) }}</template>
+           </el-table-column>
+-          <el-table-column label="操作" width="120" fixed="right">
++          <el-table-column label="操作" width="220" fixed="right">
+             <template #default="{ row }">
+               <el-button link type="primary" @click="downloadFile(row)">下载</el-button>
++              <el-button
++                link
++                type="success"
++                :loading="ragflowIngestingFileId === row.id"
++                @click="ingestFileToRagFlow(row)"
++              >
++                入库 RAGFlow
++              </el-button>
+             </template>
+           </el-table-column>
+         </el-table>
+@@ -234,6 +264,23 @@
+         <el-button type="primary" :loading="reviewSubmitting" @click="submitReviewDecision">提交审核</el-button>
+       </template>
+     </el-dialog>
++
++    <el-drawer v-model="chunksDrawerVisible" title="RAGFlow 切片结果" size="760px">
++      <div v-loading="chunksLoading">
++        <el-table :data="ragflowChunks" border empty-text="暂无切片">
++          <el-table-column label="#" type="index" width="60" />
++          <el-table-column prop="content" label="切片内容" min-width="420" show-overflow-tooltip />
++          <el-table-column label="关键词" width="180">
++            <template #default="{ row }">{{ (row.keywords || []).join('，') || '-' }}</template>
++          </el-table-column>
++          <el-table-column label="可用" width="90">
++            <template #default="{ row }">
++              <el-tag :type="row.available ? 'success' : 'info'">{{ row.available ? '是' : '否' }}</el-tag>
++            </template>
++          </el-table-column>
++        </el-table>
++      </div>
++    </el-drawer>
+   </div>
+ </template>
+ 
+@@ -258,6 +305,11 @@ import {
+   rejectReview,
+   submitReview as submitResourceReview
+ } from '../../api/review'
++import {
++  getResourceRagFlowChunks,
++  ingestResourceFile,
++  syncResourceRagFlow
++} from '../../api/ragflow'
+ import { getStoredUser } from '../../api/auth'
+ import {
+   callableStatusType,
+@@ -276,6 +328,11 @@ const allTags = ref([])
+ const selectedTagId = ref('')
+ const selectedFile = ref(null)
+ const uploadFiles = ref([])
++const ragflowIngestingFileId = ref(null)
++const ragflowSyncing = ref(false)
++const chunksDrawerVisible = ref(false)
++const chunksLoading = ref(false)
++const ragflowChunks = ref([])
+ const resource = reactive(createEmptyResource())
+ const reviewDialogVisible = ref(false)
+ const reviewSubmitting = ref(false)
+@@ -333,7 +390,15 @@ function createEmptyResource() {
+       aiSummary: '',
+       keySnippet: '',
+       lastParsedAt: null,
+-      workflowUsageCount: 0
++      workflowUsageCount: 0,
++      ragFlowDatasetId: '',
++      ragFlowDatasetName: '',
++      ragFlowDocumentId: '',
++      ragFlowDocumentName: '',
++      ragFlowRunStatus: '',
++      ragFlowChunkCount: 0,
++      ragFlowTokenCount: 0,
++      ragFlowError: ''
+     }
+   }
+ }
+@@ -485,6 +550,75 @@ async function downloadFile(row) {
+   }
+ }
+ 
++function defaultDatasetName() {
++  const name = `${resource.gradeName || ''}${resource.subjectName || ''}资料库`.trim()
++  return name || resource.aiMetadata.ragFlowDatasetName || '默认资料库'
++}
++
++async function ingestFileToRagFlow(row) {
++  try {
++    const { value } = await ElMessageBox.prompt('输入要入库的 RAGFlow 资料库名称', '入库 RAGFlow', {
++      confirmButtonText: '开始入库',
++      cancelButtonText: '取消',
++      inputValue: resource.aiMetadata.ragFlowDatasetName || defaultDatasetName(),
++      inputPattern: /\S+/,
++      inputErrorMessage: '资料库名称不能为空'
++    })
++
++    ragflowIngestingFileId.value = row.id
++    await ingestResourceFile(resource.id, row.id, {
++      datasetName: value.trim(),
++      parse: true,
++      operatorId: getUserId()
++    })
++    ElMessage.success('已提交 RAGFlow 入库和解析')
++    await loadPageData()
++  } catch (error) {
++    if (error !== 'cancel' && error !== 'close') {
++      ElMessage.error(error.message || '入库 RAGFlow 失败')
++    }
++  } finally {
++    ragflowIngestingFileId.value = null
++  }
++}
++
++async function syncRagFlowStatus() {
++  if (!resource.aiMetadata.ragFlowDocumentId) {
++    ElMessage.warning('这个资源还没有入库 RAGFlow')
++    return
++  }
++
++  ragflowSyncing.value = true
++  try {
++    await syncResourceRagFlow(resource.id)
++    ElMessage.success('RAGFlow 状态已同步')
++    await loadPageData()
++  } catch (error) {
++    ElMessage.error(error.message || '同步 RAGFlow 状态失败')
++  } finally {
++    ragflowSyncing.value = false
++  }
++}
++
++async function openChunksDrawer() {
++  if (!resource.aiMetadata.ragFlowDocumentId) {
++    ElMessage.warning('这个资源还没有入库 RAGFlow')
++    return
++  }
++
++  chunksDrawerVisible.value = true
++  chunksLoading.value = true
++  try {
++    ragflowChunks.value = await getResourceRagFlowChunks(resource.id)
++    await loadPageData()
++  } catch (error) {
++    ragflowChunks.value = []
++    ElMessage.error(error.message || '获取 RAGFlow 切片失败')
++  } finally {
++    chunksLoading.value = false
++  }
++}
++
+ async function submitReview() {
+   try {
+     await submitResourceReview(resource.id)
